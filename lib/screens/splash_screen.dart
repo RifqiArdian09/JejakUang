@@ -46,34 +46,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1B4332),
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
               'assets/images/logo-jejak.png',
-              width: 150,
+              width: 80,
               errorBuilder: (context, error, stackTrace) => const Icon(
                 Icons.account_balance_wallet,
                 size: 80,
-                color: Colors.white,
+                color: Color(0xFF1B4332),
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'JejakUang',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              ),
-            ),
+
             const SizedBox(height: 8),
             const Text(
               'Catat Setiap Langkah Keuanganmu',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(color: Colors.black54, fontSize: 18),
             ),
           ],
         ),

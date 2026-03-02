@@ -11,6 +11,7 @@ import '../providers/category_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../utils/currency_utils.dart';
 import '../providers/language_provider.dart';
+import '../widgets/glass_container.dart';
 
 class AddTransactionScreen extends ConsumerStatefulWidget {
   const AddTransactionScreen({super.key});
@@ -47,64 +48,39 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       );
 
       ref.read(transactionsProvider.notifier).addTransaction(transaction);
+
+      // In-app Notification
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF141E30),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Text(
+            S.text(
+              context,
+              'Berhasil mencatat transaksi',
+              'Transaction recorded successfully',
+            ),
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+
       Navigator.pop(context);
     }
   }
 
   Future<void> _scanReceipt() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: Text(S.text(context, 'Kamera', 'Camera')),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text(S.text(context, 'Galeri', 'Gallery')),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
+    final image = await _ocrService.pickImage(ImageSource.camera);
+    if (image != null) {
+      setState(() => _isScanning = true);
+      final result = await _ocrService.processReceipt(image);
+      setState(() => _isScanning = false);
 
-    if (source != null) {
-      final image = await _ocrService.pickImage(source);
-      if (image != null) {
-        setState(() => _isScanning = true);
-        final result = await _ocrService.processReceipt(image);
-        setState(() => _isScanning = false);
-
-        if (result != null && result['total'] > 0) {
-          _amountController.text = result['total'].toString();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                S.text(
-                  context,
-                  'Berhasil mengekstrak total harga!',
-                  'Successfully extracted total price!',
-                ),
-              ),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                S.text(
-                  context,
-                  'Gagal mengekstrak harga. Silakan isi manual.',
-                  'Failed to extract price. Please fill manually.',
-                ),
-              ),
-            ),
-          );
-        }
+      if (result != null && result['total'] > 0) {
+        _amountController.text = result['total'].toString();
       }
     }
   }
@@ -126,8 +102,15 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
     final wallets = ref.watch(walletsProvider);
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0E12),
       appBar: AppBar(
-        title: Text(S.text(context, 'Tambah Transaksi', 'Add Transaction')),
+        title: Text(
+          S.text(context, 'Tambah Transaksi', 'Add Transaction'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         actions: [
           IconButton(
             icon: _isScanning
@@ -136,61 +119,150 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.camera_alt),
+                : const Icon(Icons.camera_alt, color: Colors.white70),
             onPressed: _isScanning ? null : _scanReceipt,
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Type Switcher
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    _typeTab(
+                      S.text(context, 'PENGELUARAN', 'EXPENSE'),
+                      true,
+                      const Color(0xFFFF5252),
+                    ),
+                    const SizedBox(width: 8),
+                    _typeTab(
+                      S.text(context, 'PEMASUKAN', 'INCOME'),
+                      false,
+                      const Color(0xFF2CC07B),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 48),
+
+              // Amount Input Section
+              _fieldHeader(S.text(context, 'JUMLAH TOTAL', 'TOTAL AMOUNT')),
+              const SizedBox(height: 8),
+              GlassContainer(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
+                borderRadius: 24,
+                opacity: 0.05,
+                child: Row(
+                  children: [
+                    Text(
+                      _selectedWallet != null
+                          ? CurrencyUtils.getSymbol(_selectedWallet!.currency)
+                          : 'Rp ',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2CC07B),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _amountController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -1,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: '0',
+                          hintStyle: TextStyle(color: Colors.white10),
+                          isCollapsed: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty)
+                            return S.text(context, 'Isi jumlah', 'Fill amount');
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
               Row(
                 children: [
                   Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isExpense = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: _isExpense
-                              ? const Color(0xFFE63946)
-                              : Colors.grey.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          S.text(context, 'Pengeluaran', 'Expense'),
-                          style: TextStyle(
-                            color: _isExpense ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold,
+                    child: _buildGlassPicker(
+                      title: S.text(context, 'KATEGORI', 'CATEGORY'),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<Category>(
+                          value: _selectedCategory,
+                          isExpanded: true,
+                          dropdownColor: const Color(0xFF161B22),
+                          onChanged: (val) =>
+                              setState(() => _selectedCategory = val),
+                          items: categories
+                              .map(
+                                (c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(
+                                    c.name,
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          hint: Text(
+                            S.text(context, 'Pilih', 'Select'),
+                            style: const TextStyle(color: Colors.white30),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isExpense = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: !_isExpense
-                              ? const Color(0xFF2D6A4F)
-                              : Colors.grey.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          S.text(context, 'Pemasukan', 'Income'),
-                          style: TextStyle(
-                            color: !_isExpense ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold,
+                    child: _buildGlassPicker(
+                      title: S.text(context, 'DOMPET', 'WALLET'),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<Wallet>(
+                          value: _selectedWallet,
+                          isExpanded: true,
+                          dropdownColor: const Color(0xFF161B22),
+                          onChanged: (val) =>
+                              setState(() => _selectedWallet = val),
+                          items: wallets
+                              .map(
+                                (w) => DropdownMenuItem(
+                                  value: w,
+                                  child: Text(
+                                    w.name,
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          hint: Text(
+                            S.text(context, 'Pilih', 'Select'),
+                            style: const TextStyle(color: Colors.white30),
                           ),
                         ),
                       ),
@@ -198,176 +270,107 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 32),
 
-              // Amount Input
-              Text(
-                S.text(context, 'Jumlah', 'Amount'),
-                style: const TextStyle(color: Colors.black54),
-              ),
-              TextFormField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-                decoration: InputDecoration(
-                  prefixText: _selectedWallet != null
-                      ? CurrencyUtils.getSymbol(_selectedWallet!.currency)
-                      : 'Rp ',
-                  border: InputBorder.none,
-                  hintText: '0',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty)
-                    return S.text(context, 'Masukkan jumlah', 'Enter amount');
-                  if (double.tryParse(value) == null)
-                    return S.text(
-                      context,
-                      'Jumlah tidak valid',
-                      'Invalid amount',
-                    );
-                  return null;
-                },
-              ),
-              const Divider(),
-              const SizedBox(height: 20),
-
-              // Category Picker
-              Text(
-                S.text(context, 'Kategori', 'Category'),
-                style: const TextStyle(color: Colors.black54),
-              ),
+              _fieldHeader(S.text(context, 'TANGGAL', 'DATE')),
               const SizedBox(height: 8),
-              DropdownButtonFormField<Category>(
-                value: _selectedCategory,
-                items: categories
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c.name)))
-                    .toList(),
-                onChanged: (val) => setState(() => _selectedCategory = val),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (val) => val == null
-                    ? S.text(context, 'Pilih kategori', 'Select category')
-                    : null,
-              ),
-              const SizedBox(height: 20),
-
-              // Wallet Picker
-              Text(
-                S.text(context, 'Dompet / Akun', 'Wallet / Account'),
-                style: const TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<Wallet>(
-                value: _selectedWallet,
-                items: wallets
-                    .map((w) => DropdownMenuItem(value: w, child: Text(w.name)))
-                    .toList(),
-                onChanged: (val) => setState(() => _selectedWallet = val),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (val) => val == null
-                    ? S.text(context, 'Pilih dompet', 'Select wallet')
-                    : null,
-              ),
-              const SizedBox(height: 20),
-
-              // Date Picker
-              Text(
-                S.text(context, 'Tanggal', 'Date'),
-                style: const TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 8),
-              InkWell(
+              GestureDetector(
                 onTap: () async {
                   final date = await showDatePicker(
                     context: context,
                     initialDate: _selectedDate,
                     firstDate: DateTime(2000),
                     lastDate: DateTime.now(),
+                    builder: (context, child) => Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.dark(
+                          primary: Color(0xFF2CC07B),
+                          onPrimary: Colors.white,
+                          surface: Color(0xFF161B22),
+                        ),
+                      ),
+                      child: child!,
+                    ),
                   );
                   if (date != null) setState(() => _selectedDate = date);
                 },
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                child: GlassContainer(
+                  padding: const EdgeInsets.all(20),
+                  borderRadius: 20,
+                  opacity: 0.05,
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.calendar_today,
-                        size: 20,
-                        color: Colors.black54,
-                      ),
-                      const SizedBox(width: 12),
+                      const Icon(Icons.today_rounded, color: Colors.white54),
+                      const SizedBox(width: 16),
                       Text(
-                        DateFormat(
-                          'dd MMMM yyyy',
-                          S.text(context, 'id', 'en'),
-                        ).format(_selectedDate),
+                        DateFormat('EEEE, dd MMMM yyyy').format(_selectedDate),
+                        style: const TextStyle(color: Colors.white),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
 
-              // Note Input
-              Text(
-                S.text(context, 'Catatan', 'Notes'),
-                style: const TextStyle(color: Colors.black54),
-              ),
+              _fieldHeader(S.text(context, 'CATATAN (OPTIONAL)', 'NOTES')),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _noteController,
-                decoration: InputDecoration(
-                  hintText: S.text(
-                    context,
-                    'Tambahkan catatan...',
-                    'Add a note...',
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              GlassContainer(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                borderRadius: 20,
+                opacity: 0.05,
+                child: TextField(
+                  controller: _noteController,
+                  maxLines: 2,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: S.text(context, 'Beli apa...', 'Bought what...'),
+                    hintStyle: const TextStyle(color: Colors.white24),
+                    border: InputBorder.none,
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 48),
 
-              // Submit Button
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1B4332),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  height: 64,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      colors: _isExpense
+                          ? [const Color(0xFFFF5252), const Color(0xFFD32F2F)]
+                          : [const Color(0xFF2CC07B), const Color(0xFF003820)],
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            (_isExpense
+                                    ? const Color(0xFFFF5252)
+                                    : const Color(0xFF2CC07B))
+                                .withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    S.text(context, 'Simpan Transaksi', 'Save Transaction'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  child: ElevatedButton(
+                    onPressed: _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    child: Text(
+                      S.text(context, 'SIMPAN TRANSAKSI', 'SAVE TRANSACTION'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        letterSpacing: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -376,6 +379,70 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _typeTab(String label, bool value, Color color) {
+    final active = _isExpense == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _isExpense = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: active ? color : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: active ? Colors.white : Colors.white38,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fieldHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: Colors.white.withOpacity(0.3),
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 2,
+      ),
+    );
+  }
+
+  Widget _buildGlassPicker({required String title, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldHeader(title),
+        const SizedBox(height: 8),
+        GlassContainer(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          borderRadius: 20,
+          opacity: 0.05,
+          child: child,
+        ),
+      ],
     );
   }
 }

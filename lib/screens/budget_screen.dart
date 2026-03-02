@@ -7,112 +7,182 @@ import '../utils/currency_utils.dart';
 import '../models/budget.dart';
 import '../models/category.dart';
 import '../providers/language_provider.dart';
+import '../widgets/glass_container.dart';
 
 class BudgetScreen extends ConsumerWidget {
   const BudgetScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final budgets = ref.watch(budgetsProvider);
+    final budgets = ref.watch(computedBudgetsProvider);
     final categories = ref.watch(categoriesProvider);
     final summary = ref.watch(summaryProvider);
     final currency = summary['currency'] as String? ?? 'IDR';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFF0A0E12),
       appBar: AppBar(
         title: Text(
           S.text(context, 'Anggaran', 'Budget'),
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: budgets.isEmpty
           ? Center(
               child: Text(
                 S.text(context, 'Belum ada anggaran.', 'No budgets yet.'),
+                style: TextStyle(color: Colors.white.withOpacity(0.3)),
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               itemCount: budgets.length,
               itemBuilder: (context, index) {
                 final budget = budgets[index];
                 final category = categories.firstWhere(
                   (c) => c.id == budget.categoryId,
-                  orElse: () => categories.first,
+                  orElse: () => categories.isNotEmpty
+                      ? categories.first
+                      : Category(
+                          id: '0',
+                          name: '?',
+                          icon: 'circle-question',
+                          color: 0xFF9E9E9E,
+                          isExpense: true,
+                        ),
                 );
                 final percent = (budget.spent / budget.amount).clamp(0.0, 1.0);
+                final isOver = budget.spent > budget.amount;
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                return GlassContainer(
+                  padding: const EdgeInsets.all(24),
+                  borderRadius: 24,
+                  opacity: 0.05,
+                  margin: const EdgeInsets.only(bottom: 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            category.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Color(category.color).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(
+                              Icons.category_rounded,
+                              color: Color(category.color),
+                              size: 20,
                             ),
                           ),
-                          Text(
-                            '${(percent * 100).toStringAsFixed(0)}%',
-                            style: const TextStyle(color: Colors.black54),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  category.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  budget.period,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.3),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.white24,
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              ref
+                                  .read(budgetsProvider.notifier)
+                                  .deleteBudget(budget.id);
+                            },
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      LinearProgressIndicator(
-                        value: percent,
-                        backgroundColor: Colors.grey.withOpacity(0.1),
-                        valueColor: AlwaysStoppedAnimation(
-                          percent > 0.9
-                              ? const Color(0xFFE63946)
-                              : const Color(0xFF1B4332),
-                        ),
-                        minHeight: 8,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '${S.text(context, 'Terpakai', 'Spent')}: ${CurrencyUtils.format(budget.spent, currency: currency)}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
+                            '${(percent * 100).toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              color: isOver
+                                  ? const Color(0xFFFF5252)
+                                  : const Color(0xFF2CC07B),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
                             ),
                           ),
                           Text(
-                            'Limit: ${CurrencyUtils.format(budget.amount, currency: currency)}',
-                            style: const TextStyle(
+                            '${CurrencyUtils.format(budget.spent, currency: currency)} / ${CurrencyUtils.format(budget.amount, currency: currency)}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
                               fontSize: 12,
-                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: percent,
+                          backgroundColor: Colors.white.withOpacity(0.05),
+                          valueColor: AlwaysStoppedAnimation(
+                            isOver
+                                ? const Color(0xFFFF5252)
+                                : const Color(0xFF2CC07B),
+                          ),
+                          minHeight: 12,
+                        ),
+                      ),
+                      if (isOver)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            S.text(context, 'Melebihi batas!', 'Over budget!'),
+                            style: const TextStyle(
+                              color: Color(0xFFFF5252),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 );
               },
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         onPressed: () =>
             _showAddBudgetDialog(context, ref, categories, currency),
-        label: Text(S.text(context, 'Set Budget', 'Set Budget')),
-        icon: const Icon(Icons.add),
-        backgroundColor: const Color(0xFF1B4332),
+        label: Text(
+          S.text(context, 'Atur Anggaran', 'Set Budget'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        icon: const Icon(Icons.add_rounded),
+        backgroundColor: const Color(0xFF2CC07B),
         foregroundColor: Colors.white,
+        elevation: 10,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }

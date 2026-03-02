@@ -72,3 +72,7 @@ flutter:
   # Assets
   assets:
     - assets/images/logo-jejak.png
+    - assets/fonts/LexendDeca-Regular.ttf
+    - assets/fonts/LexendDeca-Bold.ttf
+    - assets/fonts/LexendDeca-Medium.ttf
+    - assets/fonts/LexendDeca-SemiBold.ttf

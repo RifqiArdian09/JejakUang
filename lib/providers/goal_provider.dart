@@ -29,6 +29,21 @@ class GoalNotifier extends StateNotifier<List<Goal>> {
     _load();
   }
 
+  Future<void> addProgress(String goalId, double amount) async {
+    final goal = _box.get(goalId);
+    if (goal != null) {
+      final updatedGoal = Goal(
+        id: goal.id,
+        name: goal.name,
+        targetAmount: goal.targetAmount,
+        currentAmount: goal.currentAmount + amount,
+        deadline: goal.deadline,
+      );
+      await _box.put(goalId, updatedGoal);
+      _load();
+    }
+  }
+
   Future<void> deleteGoal(String id) async {
     await _box.delete(id);
     _load();
