@@ -75,7 +75,13 @@ class HiveService {
     if (walletBox.isEmpty) {
       await walletBox.put(
         'main',
-        Wallet(id: 'main', name: 'Dompet Utama', balance: 0, type: 'Dompet'),
+        Wallet(
+          id: 'main',
+          name: 'Dompet Utama',
+          balance: 0,
+          type: 'Dompet',
+          currency: 'IDR',
+        ),
       );
     }
   }

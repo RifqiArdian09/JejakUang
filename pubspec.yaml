@@ -44,6 +44,8 @@ dependencies:
   image_picker: ^1.0.7
   font_awesome_flutter: ^10.7.0
   google_fonts: ^6.2.1
+  file_picker: ^8.0.0
+  csv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -67,3 +69,6 @@ flutter:
         - asset: assets/fonts/LexendDeca-SemiBold.ttf
           weight: 600
 
+  # Assets
+  assets:
+    - assets/images/logo-jejak.png
